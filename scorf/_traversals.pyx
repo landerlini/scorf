@@ -6,8 +6,8 @@ cimport numpy as np
 ctypedef np.float_t FLOAT_t
 ctypedef np.int_t INT_t
 
-#@cython.boundscheck(False)
-#@cython.wraparound(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def scorf_sample (
       np.ndarray[FLOAT_t, ndim=2] X, 
       np.ndarray[FLOAT_t, ndim=2] domain,
@@ -25,9 +25,11 @@ def scorf_sample (
   cdef int nTrees = feature.shape[0]
   cdef int nNodes = feature.shape[1]
   cdef int goRight = False;
+  cdef int estimated_depth = int ( np.log ( nNodes ) / np.log(2) ) 
 
-  cdef np.ndarray [FLOAT_t, ndim=2] r = np.random.uniform ( 0, 1, (nE, nNodes) )
-  cdef np.ndarray [FLOAT_t, ndim=2] R = np.random.uniform ( 0, 1, (nE, nY) )
+  cdef np.ndarray [FLOAT_t, ndim=1] r = np.random.uniform ( 0, 1, nE*estimated_depth )
+  cdef int i = 0;
+  out = np.random.uniform ( 0, 1, (nE, nY) )
   cdef np.ndarray [INT_t, ndim=1] iTrees = np.random.randint ( 0, nTrees, nE )
 
   cdef np.ndarray [FLOAT_t, ndim=1] dmin = np.empty (nX+nY) 
@@ -52,7 +54,9 @@ def scorf_sample (
 
       wRatio = value[iTree,left[iTree,iNode]]/value[iTree,iNode]
       if f < nX: goRight = ( X[iRow, f] > th )
-      else: goRight = ( r[iRow,iNode] > wRatio )
+      else: 
+        goRight = ( r[i] > wRatio )
+        i += 1
 
 
       if goRight:
@@ -65,7 +69,7 @@ def scorf_sample (
       
 
     for f in range (nY):
-      out [iRow, f] = R[iRow, f] * (dmax[nX+f]-dmin[nX+f]) + dmin[nX+f] 
+      out [iRow, f] = out[iRow, f] * (dmax[nX+f]-dmin[nX+f]) + dmin[nX+f] 
 
   return out 
 
