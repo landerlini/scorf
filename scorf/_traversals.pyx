@@ -26,7 +26,7 @@ def scorf_sample (
   cdef int nNodes = feature.shape[1]
   cdef int goRight = False;
 
-  cdef np.ndarray [FLOAT_t, ndim=1] r = np.random.uniform ( 0, 1, nE )
+  cdef np.ndarray [FLOAT_t, ndim=2] r = np.random.uniform ( 0, 1, (nE, nNodes) )
   cdef np.ndarray [FLOAT_t, ndim=2] R = np.random.uniform ( 0, 1, (nE, nY) )
   cdef np.ndarray [INT_t, ndim=1] iTrees = np.random.randint ( 0, nTrees, nE )
 
@@ -47,13 +47,16 @@ def scorf_sample (
     iNode = 0
     iTree = iTrees[iRow]
     print ("tree: ", iTree)
+    print ("X: ", X[iRow,0])
     while feature [iTree, iNode] >= 0:
       f = feature [iTree, iNode] 
       th = threshold[iTree,iNode]
 
       wRatio = value[iTree,left[iTree,iNode]]/value[iTree,iNode]
       if f < nX: goRight = ( X[iRow, f] > th )
-      else: goRight = ( r[iRow] > wRatio )
+      else: goRight = ( r[iRow,iNode] > wRatio )
+
+      print ("f", f, f < nX , "th", th, "ratio", wRatio, "r", r[iRow,iNode], goRight)
 
       if goRight:
         if dmin [ f ] < th: dmin [ f ] = th
@@ -62,10 +65,11 @@ def scorf_sample (
         if dmax [ f ] > th: dmax [ f ] = th
         iNode = left[iTree, iNode] 
 
+      
+
     for f in range (nY):
       out [iRow, f] = R[iRow, f] * (dmax[nX+f]-dmin[nX+f]) + dmin[nX+f] 
 
-      
   return out 
 
 
