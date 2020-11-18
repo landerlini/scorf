@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 
-from ._traversals import test 
+from ._traversals import scorf_sample 
 
 class RandomForestSampler:
   def __init__ (self, 
