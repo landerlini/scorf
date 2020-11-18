@@ -60,7 +60,7 @@ def scorf_sample (
         iNode = left[iTree, iNode] 
 
     for f in range (nY):
-      out [iRow, f] = R[iRow, nY] * (dmax[nX+f]-dmin[nX+f]) + dmin[nX+f] 
+      out [iRow, f] = R[iRow, f] * (dmax[nX+f]-dmin[nX+f]) + dmin[nX+f] 
 
       
   return out 
