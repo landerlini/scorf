@@ -147,7 +147,7 @@ class RandomForestSampler:
         f = tree.feature [iNode]
         goRight = False 
 
-        if f < self.n_conditions_: goRight = (X[f]>th)
+        if f < self.n_conditions_: goRight = (xRow[f]>th)
         else: goRight = (r > wr) 
 
         if not goRight:
