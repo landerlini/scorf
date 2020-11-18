@@ -5,8 +5,8 @@ cimport numpy as np
 ctypedef np.float_t FLOAT_t
 ctypedef np.int_t INT_t
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
+#@cython.boundscheck(False)
+#@cython.wraparound(False)
 def scorf_sample (
       np.ndarray[FLOAT_t, ndim=2] X, 
       np.ndarray[FLOAT_t, ndim=2] domain,
@@ -45,10 +45,11 @@ def scorf_sample (
 
     iNode = 0
     iTree = iTrees[iRow]
-    while feature [iTree, iNode] > 0:
+    while feature [iTree, iNode] >= 0:
       f = feature [iTree, iNode] 
-      wRatio = value[iTree,left[iTree,iNode]]/value[iTree,iNode]
       th = threshold[iTree,iNode]
+
+      wRatio = value[iTree,left[iTree,iNode]]/value[iTree,iNode]
       if f < nX: goRight = ( X[iRow, f] > th )
       else: goRight = ( r[iRow] > wRatio )
 
