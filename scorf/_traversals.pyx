@@ -50,7 +50,7 @@ def scorf_sample (
       wRatio = value[iTree,left[iTree,iNode]]/value[iTree,iNode]
       th = threshold[iTree,iNode]
       if f < nX: goRight = ( X[iRow, f] > th )
-      else: goRight = ( r[iRow] > th )
+      else: goRight = ( r[iRow] > wRatio )
 
       if goRight:
         if dmin [ f ] < th: dmin [ f ] = th
