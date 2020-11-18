@@ -45,6 +45,7 @@ def scorf_sample (
 
     iNode = 0
     iTree = iTrees[iRow]
+    print ("tree: ", iTree)
     while feature [iTree, iNode] >= 0:
       f = feature [iTree, iNode] 
       th = threshold[iTree,iNode]
