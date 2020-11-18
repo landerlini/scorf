@@ -46,8 +46,6 @@ def scorf_sample (
 
     iNode = 0
     iTree = iTrees[iRow]
-    print ("tree: ", iTree)
-    print ("X: ", X[iRow,0])
     while feature [iTree, iNode] >= 0:
       f = feature [iTree, iNode] 
       th = threshold[iTree,iNode]
@@ -56,7 +54,6 @@ def scorf_sample (
       if f < nX: goRight = ( X[iRow, f] > th )
       else: goRight = ( r[iRow,iNode] > wRatio )
 
-      print ("f", f, f < nX , "th", th, "ratio", wRatio, "r", r[iRow,iNode], goRight)
 
       if goRight:
         if dmin [ f ] < th: dmin [ f ] = th
