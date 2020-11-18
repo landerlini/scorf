@@ -55,7 +55,7 @@ def scorf_sample (
       wRatio = value[iTree,left[iTree,iNode]]/value[iTree,iNode]
       if f < nX: goRight = ( X[iRow, f] > th )
       else: 
-        goRight = ( r[i] > wRatio )
+        goRight = ( r[i%(nE*estimated_depth)] > wRatio )
         i += 1
 
 
