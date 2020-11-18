@@ -1,4 +1,5 @@
 import setuptools 
+from Cython.Build import cythonize 
 
 with open ("README.md", "r") as fh:
   long_description = fh.read() 
@@ -11,6 +12,7 @@ setuptools.setup (
   author = 'Lucio Anderlini',
   author_email = 'l.anderlini@gmail.com',
   description = 'Sampling from a Conditioned Random Forest',
+  ext_modules = cythonize("scorf/_traversals.pyx"), 
   long_description = long_description,
   long_description_content_type = 'text/markdown', 
   url = 'https://github.com/landerlini/scorf',

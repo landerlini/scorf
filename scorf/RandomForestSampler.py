@@ -1,13 +1,15 @@
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 
+from ._traversals import test 
+
 class RandomForestSampler:
   def __init__ (self, 
         n_estimators=100, *, 
-        criterion='gini', 
+        criterion='entropy', 
         max_depth=None, 
         min_samples_split=2, 
-        min_samples_leaf=1, 
+        min_samples_leaf=5, 
         min_weight_fraction_leaf=0.0, 
         max_features='auto', 
         max_leaf_nodes=None, 
@@ -25,6 +27,7 @@ class RandomForestSampler:
         ##
         domain_extent = 0.1, 
         normalization_ratio = 10., 
+        normalization_weight = 100., 
       ):
 
     ## Create the forest 
@@ -55,6 +58,7 @@ class RandomForestSampler:
     self.domain_extent_ = domain_extent
     self.normalization_ratio_ = normalization_ratio
     self.cached_tree_arrays_ = None
+    self.normalization_weight_ = normalization_weight
 
   @property 
   def n_estimators_ (self):
@@ -109,11 +113,12 @@ class RandomForestSampler:
     self._update_domain ( XY )
 
     nN = int(len(XY) * self.normalization_ratio_)
+    w  = sample_weight or np.ones (len(XY), dtype = np.float)
+    ws = np.full (nN, self.normalization_weight_, dtype = np.float)
 
     N = np.stack ([
         np.random.uniform ( row[0], row[1], nN ) for row in self.domain_ 
       ]).T 
-    print (N.shape) 
 
     self.cached_tree_array = None 
     self.forest_.fit ( 
@@ -128,7 +133,10 @@ class RandomForestSampler:
     return self.forest_.predict_proba ( XY ) [:, 1] 
 
 
-  def predict (self, X): 
+  def predict_slow (self, X): 
+    if len(X.shape) < 2: 
+      raise ValueError ("Ambiguous array for X, did you mean np.c_[X]?") 
+
     if self.cached_tree_arrays_ is None:
       self._cache_trees() 
 
@@ -159,17 +167,37 @@ class RandomForestSampler:
 
       ret [iRow] = np.array([np.random.uniform (row[0], row[1]) for row in domain[self.n_conditions_:]])
 
-    print (ret.shape) 
     return ret if len(ret.shape) == 2 else np.expand_dims (ret,0)
 
+  def predict (self, X): 
+    if len(X.shape) < 2: 
+      raise ValueError ("Ambiguous array for X, did you mean np.c_[X]?") 
+
+    if self.cached_tree_arrays_ is None:
+      self._cache_trees() 
+
+    ret = np.empty ( (len(X), self.forest_.n_features_ - self.n_conditions_ ) )
+
+    return (scorf_sample ( X, 
+              self.domain_,
+              self.cached_tree_arrays_ ['feature'], 
+              self.cached_tree_arrays_ ['threshold'], 
+              self.cached_tree_arrays_ ['value'], 
+              self.cached_tree_arrays_ ['children_left'], 
+              self.cached_tree_arrays_ ['children_right'], 
+              ret
+            ))
 
   def _cache_trees ( self ): 
     self.cached_tree_arrays_ = dict() 
     trees = [t.tree_ for t in self.forest_.estimators_] 
     n_nodes = np.max ( [len(t.feature) for t in trees] ) 
-    for var in ['feature', 'threshold', 'value', 'children_left', 'children_right']:
+    for var in ['feature', 'threshold', 'children_left', 'children_right']:
       self.cached_tree_arrays_ [var] = np.stack ( [
           np.resize(getattr(t,var), n_nodes) for t in trees 
         ] )
+    self.cached_tree_arrays_ ['value'] = np.stack ([
+        np.resize(t.value[:,:,1], n_nodes) for t in trees 
+      ]) 
 
 
