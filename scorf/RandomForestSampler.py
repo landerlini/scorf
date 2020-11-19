@@ -128,8 +128,8 @@ class RandomForestSampler:
       new_domain = np.stack ( [m - R*self.domain_extent_, M + R*self.domain_extent_] ).T 
       print (self.domain_.shape) 
       self.domain_ = np.stack ( [
-            np.minimum ( self.domain_[0], new_domain[0] ), 
-            np.maximum ( self.domain_[1], new_domain[1] ), 
+            np.minimum ( self.domain_[:,0], new_domain[:,0] ), 
+            np.maximum ( self.domain_[:,1], new_domain[:,1] ), 
           ] ).T
       print (self.domain_.shape) 
 
