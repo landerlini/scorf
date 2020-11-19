@@ -129,7 +129,7 @@ class RandomForestSampler:
       self.domain_ = np.stack ( [
             np.minimum ( self.domain_[0], new_domain[0] ), 
             np.maximum ( self.domain_[1], new_domain[1] ), 
-          ] )
+          ] ).T
 
 
   
