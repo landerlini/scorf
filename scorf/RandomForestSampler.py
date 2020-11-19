@@ -1,9 +1,54 @@
+"""
+RandomForestSampler
+-------------------
+
+The construction of MC generators able to reproduce distributions obtained 
+from a dataset of real data is of crucial importance to parametrize the 
+response of complex systems in simulation and what-if studies. 
+`RandomForestSampler` is a thin overlay on top of scikit-learn 
+`RandomForestClassifier` designed to learn the distribution of a 
+training dataset from the comparison with a uniformly distributed sample.
+The trained forest can then be used to sample a single tree, and from 
+that tree a leaf, possibly depending on some condition of part of the 
+variables. A new data is obtained from uniform generation within the 
+leaf volume. 
+
+"""
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 
 from ._traversals import scorf_sample 
 
 class RandomForestSampler:
+  """
+  RandomForestSampler
+  -------------------
+
+  A thin layer built on top of scikit-learn `RandomForestClassifier`
+  to learn the distribution of an input dataset and efficiently 
+  sampling it. 
+
+  Most of the input parameters are passed to `RandomForestClassifier`
+  but some default value was tweaked to make it more sensible for 
+  density estimation. 
+
+  Additional parameters are :
+   - domain_extent (float, default: 0.1)
+     The domain of the input dataset is estimated from the training 
+     data set, a frame of `domain_extent`*var_range is built all around
+     the domain to ensure the training dataset is fully contained
+
+   - normalization_ratio (float, default: 10)
+     A uniform dataset is generated to build a density estimation tree
+     out of a decision tree. The number of generated events is 
+     `normalization_ratio` times the number of events passed as 
+     training dataset
+  
+   - normalization_weight (float, default: 100)
+     a weight applied during the training to the normalization dataset.
+     It should be as large as not compromising numerical accuracy 
+  
+  """
   def __init__ (self, 
         n_estimators=100, *, 
         criterion='entropy', 
@@ -62,6 +107,7 @@ class RandomForestSampler:
 
   @property 
   def n_estimators_ (self):
+    "Number of estimators, property binded to `sklearn.RandomForestClassifier`"
     return self.tree.n_estimators_
 
   @n_estimators_.setter
@@ -70,6 +116,7 @@ class RandomForestSampler:
 
 
   def _update_domain (self, XY): 
+    "Computes var_range to guess the domain, widening previous guess if needed"
     m = np.min ( XY, axis = 0 ) 
     M = np.max ( XY, axis = 0 ) 
     R = M-m 
@@ -86,29 +133,60 @@ class RandomForestSampler:
 
 
   
-  def _validate_input ( self, X, Y, sample_weight = None ):
-    if len(X) != len(Y): 
-      raise ValueError ("Inconsistent shape of X and Y input arrays")
+  def _validate_input ( self, X, Y = None, sample_weight = None ):
+    "Validates the X, Y and weight inputs, returning the merged XY dataset"
     if sample_weight is not None and len(sample_weight) != len(X): 
       raise ValueError ("Inconsistent shape of the weight input array")
 
     if len(X.shape) == 1: X = np.expand_dims ( X, -1 ) 
-    if len(Y.shape) == 1: Y = np.expand_dims ( Y, -1 ) 
-
     if len(X.shape) != 2: 
       raise ValueError ( "Unexpected X rank: %d" % len(X.shape)) 
 
-    if len(Y.shape) != 2: 
-      raise ValueError ( "Unexpected Y rank: %d" % len(X.shape)) 
 
-    self.n_conditions_ = self.n_conditions_ or  X.shape[-1] 
-    if self.n_conditions_ != X.shape[-1]: 
-      raise ValueError ("Number of conditions changed during training" )
+    if Y is not None:
+      if len(X) != len(Y): 
+        raise ValueError ("Inconsistent shape of X and Y input arrays")
 
-    return np.concatenate ( [X, Y], axis = 1 ) 
+      if len(Y.shape) == 1: Y = np.expand_dims ( Y, -1 ) 
+
+      if len(Y.shape) != 2: 
+        raise ValueError ( "Unexpected Y rank: %d" % len(X.shape)) 
+
+      if self.n_conditions_ is None: self.n_conditions_ = X.shape[-1]
+      if self.n_conditions_ != X.shape[-1]: 
+        raise ValueError ("Number of conditions changed during training" )
+
+      return np.concatenate ( [X, Y], axis = 1 ) 
+
+    else: # Y is None 
+      self.n_conditions_ = self.n_conditions_ or 0
+      if self.n_conditions_ is None: self.n_conditions_ = 0
+      if self.n_conditions_ != 0:
+        raise ValueError ("Number of conditions changed during training" )
+
+      return X
 
 
-  def fit (self, X, Y, sample_weight = None):
+
+  def fit (self, X, Y = None, sample_weight = None):
+    """Fit the density estimation tree.
+    
+    Arguments:
+     - X: np.ndarray 
+       the conditions of the pdf (Y|X) to be trained if Y is not None,
+       otherwise the complete dataset for training non-conditional pdf(X)
+       Must have shape (n_entries, n_conditional_features)
+
+     - Y: np.ndarray or None
+       the conditioned variables to be sampled, if None the unconditioned 
+       pdf (X) is trained. 
+       If not None, must have shape (n_entries, n_conditioned_features)
+
+     - sample_weights: np.ndarray or None
+       the weights of the training sample, if None the sample is assumed 
+       unweighted. Must have shape (n_entries,) 
+
+    """
     XY = self._validate_input ( X, Y, sample_weight ) 
     self._update_domain ( XY )
 
@@ -128,12 +206,21 @@ class RandomForestSampler:
       )
 
 
-  def validation_weights ( self, X, Y, sample_weight = None ):
+  def validation_weights ( self, X, Y = None, sample_weight = None ):
+    """
+    Return validation weights to be used to assess the quality of the 
+    training comparing the distribution of the trained sample to a 
+    uniform dataset weighted with the returned trained weights. 
+
+    Absolute scale of the weights has no meaning, only their relative 
+    values has.
+    """
     XY = self._validate_input ( X, Y, sample_weight ) 
     return self.forest_.predict_proba ( XY ) [:, 1] 
 
 
-  def predict_slow (self, X): 
+  def _predict_slow (self, X): 
+    "Pure-python implementation of the prediction method, for debugging only"
     if len(X.shape) < 2: 
       raise ValueError ("Ambiguous array for X, did you mean np.c_[X]?") 
 
@@ -170,25 +257,67 @@ class RandomForestSampler:
     return ret if len(ret.shape) == 2 else np.expand_dims (ret,0)
 
   def predict (self, X): 
-    if len(X.shape) < 2: 
-      raise ValueError ("Ambiguous array for X, did you mean np.c_[X]?") 
+    """
+    Randomly generates a sample distributed according to the underlying pdf of 
+    the training sample. 
 
-    if self.cached_tree_arrays_ is None:
-      self._cache_trees() 
+    If the parameter X is an array, it must define the conditions to the 
+    generated sample, and only the generated Y variables are returned. 
+    If it is instead an integer, then both X and Y variables are generated 
+    and returned in a unique, stacked array. 
 
-    ret = np.empty ( (len(X), self.forest_.n_features_ - self.n_conditions_ ) )
+    Parameters:
+     - X: np.ndarray or int
+       Either the conditions for the sampled dataset, 
+       expressed as a (n_entries, n_conditional_features) array; 
+       or an integer defining the number of samples to be generated.
 
-    return (scorf_sample ( X, 
-              self.domain_,
-              self.cached_tree_arrays_ ['feature'], 
-              self.cached_tree_arrays_ ['threshold'], 
-              self.cached_tree_arrays_ ['value'], 
-              self.cached_tree_arrays_ ['children_left'], 
-              self.cached_tree_arrays_ ['children_right'], 
-              ret
-            ))
+    Returns: np.ndarray
+      An array with shape (n_entries, n_features) where n_features is 
+      n_conditional_features + n_conditioned_features if X is an integer 
+      defining n_entries. Or, otherwise, of an array of shape 
+      (n_entries, n_conditioned_features). 
+
+    """
+    if isinstance (X, np.ndarray):
+      if len(X.shape) < 2: 
+        raise ValueError ("Ambiguous array for X, did you mean np.c_[X]?") 
+
+      if self.cached_tree_arrays_ is None:
+        self._cache_trees() 
+
+      ret = np.empty ( (len(X), self.forest_.n_features_ - self.n_conditions_ ) )
+
+      return (scorf_sample ( X, 
+                self.domain_,
+                self.cached_tree_arrays_ ['feature'], 
+                self.cached_tree_arrays_ ['threshold'], 
+                self.cached_tree_arrays_ ['value'], 
+                self.cached_tree_arrays_ ['children_left'], 
+                self.cached_tree_arrays_ ['children_right'], 
+                ret
+              ))
+    elif isinstance (X, int):
+      if X <= 0:
+        raise ValueError ("Can not produce a negative number of events") 
+
+      if self.cached_tree_arrays_ is None:
+        self._cache_trees() 
+
+      ret = np.empty ( (X, self.forest_.n_features_ ) )
+
+      return (scorf_sample ( np.empty ( (X,0)), 
+                self.domain_,
+                self.cached_tree_arrays_ ['feature'], 
+                self.cached_tree_arrays_ ['threshold'], 
+                self.cached_tree_arrays_ ['value'], 
+                self.cached_tree_arrays_ ['children_left'], 
+                self.cached_tree_arrays_ ['children_right'], 
+                ret
+              ))
 
   def _cache_trees ( self ): 
+    "Internal. Stores all trees in a set of large arrays readable with Cython"
     self.cached_tree_arrays_ = dict() 
     trees = [t.tree_ for t in self.forest_.estimators_] 
     n_nodes = np.max ( [len(t.feature) for t in trees] ) 

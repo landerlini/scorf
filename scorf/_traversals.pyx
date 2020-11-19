@@ -18,6 +18,7 @@ def scorf_sample (
       np.ndarray[INT_t,   ndim=2] right, 
       np.ndarray[FLOAT_t, ndim=2] out, 
     ):
+  "Fast implementation of sampling from the trained DET"
 
   cdef int nE = X.shape[0]
   cdef int nX = X.shape[1]
@@ -66,39 +67,9 @@ def scorf_sample (
         if dmax [ f ] > th: dmax [ f ] = th
         iNode = left[iTree, iNode] 
 
-      
 
     for f in range (nY):
       out [iRow, f] = out[iRow, f] * (dmax[nX+f]-dmin[nX+f]) + dmin[nX+f] 
 
   return out 
-
-
-  
-#    i
-#
-#    for iRow, xRow in enumerate(X): 
-#      iTree = np.random.choice ( len(trees) )
-#      tree = trees[iTree] 
-#      v = tree.value[:,:,1]
-#      iNode = 0
-#      domain = self.domain_.copy() 
-#      while tree.feature[iNode] >= 0:
-#        r = np.random.uniform(0,1)
-#        wr = v[tree.children_left[iNode]]/v[iNode]
-#        th = tree.threshold[iNode]
-#        f = tree.feature [iNode]
-#        goRight = False 
-#
-#        if f < self.n_conditions_: goRight = (xRow[f]>th)
-#        else: goRight = (r > wr) 
-#
-#        if not goRight:
-#          domain [tree.feature[iNode],1] = min(domain [tree.feature[iNode],1], tree.threshold[iNode])
-#          iNode = tree.children_left[iNode]
-#        else:
-#          domain [tree.feature[iNode],0] = max(domain [tree.feature[iNode],0], tree.threshold[iNode])
-#          iNode = tree.children_right[iNode]
-#
-#      ret [iRow] = np.array([np.random.uniform (row[0], row[1]) for row in domain[self.n_conditions_:]])
 
