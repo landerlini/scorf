@@ -54,6 +54,9 @@ sampler.predict(np.c_[X[:10]])
 sampler.predict(10)
 ```
 
+A more completed example, with histograms and scatter plots can be found at 
+https://colab.research.google.com/drive/1p5kedf5ocvTrsrUi1fygUuxIBlSFvfwq?usp=sharing
+
 ### Related works 
 While fast and robust, Random Decision Forests are not competitive with GANs in 
 terms of quality of the generated dataset. 
