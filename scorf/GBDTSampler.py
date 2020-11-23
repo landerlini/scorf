@@ -1,17 +1,17 @@
 """
 GBDTSampler
--------------------
+-----------
 
 """
 import numpy as np
 from sklearn.ensemble import GradientBoostingClassifier
 
-from ._traversals import scorf_sample 
+from ._traversals import scorf_sample, scorf_bdt_sample
 
-class RandomForestSampler:
+class GBDTSampler:
   """
   GBDTSampler
-  -------------------
+  -----------
 
   A thin layer built on top of scikit-learn `GradientBoostingClassifier`
   to learn the distribution of an input dataset and efficiently 
@@ -39,7 +39,7 @@ class RandomForestSampler:
 
   """
   def __init__ (self, 
-        loss='entropy', 
+        loss='deviance', 
         learning_rate=0.1, 
         n_estimators=100, 
         subsample=1.0, 
@@ -99,6 +99,7 @@ class RandomForestSampler:
     self.normalization_ratio_ = normalization_ratio
     self.cached_tree_arrays_ = None
     self.normalization_weight_ = normalization_weight
+    self._learning_rate = learning_rate 
 
   @property 
   def n_estimators_ (self):
@@ -108,6 +109,11 @@ class RandomForestSampler:
   @n_estimators_.setter
   def n_estimators_ (self, newval):
     self.forest_.n_estimators_ = newval
+
+  @property 
+  def learning_rate  (self):
+    return self._learning_rate
+    
 
 
   def _update_domain (self, XY): 
@@ -251,77 +257,78 @@ class RandomForestSampler:
 #
 #    return ret if len(ret.shape) == 2 else np.expand_dims (ret,0)
 
-##   def predict (self, X): 
-##     """
-##     Randomly generates a sample distributed according to the underlying pdf of 
-##     the training sample. 
-## 
-##     If the parameter X is an array, it must define the conditions to the 
-##     generated sample, and only the generated Y variables are returned. 
-##     If it is instead an integer, then both X and Y variables are generated 
-##     and returned in a unique, stacked array. 
-## 
-##     Parameters:
-##      - X: np.ndarray or int
-##        Either the conditions for the sampled dataset, 
-##        expressed as a (n_entries, n_conditional_features) array; 
-##        or an integer defining the number of samples to be generated.
-## 
-##     Returns: np.ndarray
-##       An array with shape (n_entries, n_features) where n_features is 
-##       n_conditional_features + n_conditioned_features if X is an integer 
-##       defining n_entries. Or, otherwise, of an array of shape 
-##       (n_entries, n_conditioned_features). 
-## 
-##     """
-##     if isinstance (X, np.ndarray):
-##       if len(X.shape) < 2: 
-##         raise ValueError ("Ambiguous array for X, did you mean np.c_[X]?") 
-## 
-##       if self.cached_tree_arrays_ is None:
-##         self._cache_trees() 
-## 
-##       ret = np.empty ( (len(X), self.forest_.n_features_ - self.n_conditions_ ) )
-## 
-##       return (scorf_sample ( X, 
-##                 self.domain_,
-##                 self.cached_tree_arrays_ ['feature'], 
-##                 self.cached_tree_arrays_ ['threshold'], 
-##                 self.cached_tree_arrays_ ['value'], 
-##                 self.cached_tree_arrays_ ['children_left'], 
-##                 self.cached_tree_arrays_ ['children_right'], 
-##                 ret
-##               ))
-##     elif isinstance (X, int):
-##       if X <= 0:
-##         raise ValueError ("Can not produce a negative number of events") 
-## 
-##       if self.cached_tree_arrays_ is None:
-##         self._cache_trees() 
-## 
-##       ret = np.empty ( (X, self.forest_.n_features_ ) )
-## 
-##       return (scorf_sample ( np.empty ( (X,0)), 
-##                 self.domain_,
-##                 self.cached_tree_arrays_ ['feature'], 
-##                 self.cached_tree_arrays_ ['threshold'], 
-##                 self.cached_tree_arrays_ ['value'], 
-##                 self.cached_tree_arrays_ ['children_left'], 
-##                 self.cached_tree_arrays_ ['children_right'], 
-##                 ret
-##               ))
+  def predict (self, X): 
+    """
+    Randomly generates a sample distributed according to the underlying pdf of 
+    the training sample. 
+ 
+    If the parameter X is an array, it must define the conditions to the 
+    generated sample, and only the generated Y variables are returned. 
+    If it is instead an integer, then both X and Y variables are generated 
+    and returned in a unique, stacked array. 
+ 
+    Parameters:
+     - X: np.ndarray or int
+       Either the conditions for the sampled dataset, 
+       expressed as a (n_entries, n_conditional_features) array; 
+       or an integer defining the number of samples to be generated.
+ 
+    Returns: np.ndarray
+      An array with shape (n_entries, n_features) where n_features is 
+      n_conditional_features + n_conditioned_features if X is an integer 
+      defining n_entries. Or, otherwise, of an array of shape 
+      (n_entries, n_conditioned_features). 
+ 
+    """
+    if isinstance (X, np.ndarray):
+      if len(X.shape) < 2: 
+        raise ValueError ("Ambiguous array for X, did you mean np.c_[X]?") 
+ 
+      if self.cached_tree_arrays_ is None:
+        self._cache_trees() 
+ 
+      ret = np.empty ( (len(X), self.forest_.n_features_ - self.n_conditions_ ) )
+ 
+      return (scorf_bdt_sample( X, 
+                self.domain_,
+                self.cached_tree_arrays_ ['feature'], 
+                self.cached_tree_arrays_ ['threshold'], 
+                self.cached_tree_arrays_ ['value'], 
+                self.cached_tree_arrays_ ['children_left'], 
+                self.cached_tree_arrays_ ['children_right'], 
+                self.learning_rate, 
+                ret
+              ))
+    elif isinstance (X, int):
+      if X <= 0:
+        raise ValueError ("Can not produce a negative number of events") 
+ 
+      if self.cached_tree_arrays_ is None:
+        self._cache_trees() 
+ 
+      ret = np.empty ( (X, self.forest_.n_features_ ) )
+ 
+      return (scorf_sample ( np.empty ( (X,0)), 
+                self.domain_,
+                self.cached_tree_arrays_ ['feature'], 
+                self.cached_tree_arrays_ ['threshold'], 
+                self.cached_tree_arrays_ ['value'], 
+                self.cached_tree_arrays_ ['children_left'], 
+                self.cached_tree_arrays_ ['children_right'], 
+                ret
+              ))
 
   def _cache_trees ( self ): 
     "Internal. Stores all trees in a set of large arrays readable with Cython"
     self.cached_tree_arrays_ = dict() 
-    trees = [t.tree_ for t in self.forest_.estimators_] 
+    trees = [t[0].tree_ for t in self.forest_.estimators_] 
     n_nodes = np.max ( [len(t.feature) for t in trees] ) 
     for var in ['feature', 'threshold', 'children_left', 'children_right']:
       self.cached_tree_arrays_ [var] = np.stack ( [
           np.resize(getattr(t,var), n_nodes) for t in trees 
         ] )
     self.cached_tree_arrays_ ['value'] = np.stack ([
-        np.resize(t.value[:,:,1], n_nodes) for t in trees 
+        np.resize(t.value[:,0,0], n_nodes) for t in trees 
       ]) 
 
 

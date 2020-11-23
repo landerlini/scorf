@@ -73,3 +73,80 @@ def scorf_sample (
 
   return out 
 
+
+
+################################################################################
+## BDT part 
+################################################################################
+from libc.stdlib cimport rand, RAND_MAX
+from libc.math cimport exp2
+
+def _rnd ( float m, float M ):
+  return m + (float (rand())/float(RAND_MAX)) * (M-m) 
+
+
+
+
+################################################################################
+## Rejection method with GBDT 
+################################################################################
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def scorf_bdt_sample (
+      np.ndarray[FLOAT_t, ndim=2] X, 
+      np.ndarray[FLOAT_t, ndim=2] domain,
+      np.ndarray[INT_t,   ndim=2] feature, 
+      np.ndarray[FLOAT_t, ndim=2] threshold, 
+      np.ndarray[FLOAT_t, ndim=2] value, 
+      np.ndarray[INT_t,   ndim=2] left, 
+      np.ndarray[INT_t,   ndim=2] right, 
+      float learning_rate,
+      np.ndarray[FLOAT_t, ndim=2] out, 
+    ):
+  "Fast implementation of sampling from the trained Gradient Boosting Classifier"
+
+  cdef int nE = X.shape[0]
+  cdef int nX = X.shape[1]
+  cdef int nY = out.shape[1]
+  cdef int nTrees = feature.shape[0]
+  cdef int nNodes = feature.shape[1]
+  cdef int goRight = False;
+
+  cdef FLOAT_t v = 0. 
+  cdef FLOAT_t likelihood = 0. 
+
+  cdef int iNone = 0;
+
+  for iRow in range(nE):
+    for iAttempt in range (100): 
+      for iOut in range (nY): 
+        out[iRow, iOut] = _rnd ( domain[iOut+nX,0], domain[iOut+nX,1] )
+
+      loglikelihood = 0. 
+      for iTree in range(nTrees): 
+        iNode = 0
+        while feature [iTree, iNode] >= 0:
+          if feature[iTree, iNode] < X.shape[1]: ## X variable 
+            v = X[iRow, feature[iTree, iNode]] 
+          else: ## Y variable 
+            v = out[iRow, feature[iTree, iNode] - nX]
+
+          if v > threshold[iTree, iNode]:
+            iNode = right[iTree, iNode]
+          else:
+            iNode = left[iTree, iNode] 
+
+        loglikelihood += learning_rate * value[iTree, iNode] 
+     
+      if _rnd(0,1) < 1. / (1. + exp2(loglikelihood)):
+        break ## Accept 
+
+    if iAttempt == 100: 
+      raise RuntimeError ( 
+          "Warning, sampling failed to converge after 100 iteration"
+        )
+
+  return out 
+
+
+        
