@@ -126,7 +126,7 @@ def scorf_bdt_sample (
       for iTree in range(nTrees): 
         iNode = 0
         while feature [iTree, iNode] >= 0:
-          if feature[iTree, iNode] < X.shape[1]: ## X variable 
+          if feature[iTree, iNode] < nX: ## X variable 
             v = X[iRow, feature[iTree, iNode]] 
           else: ## Y variable 
             v = out[iRow, feature[iTree, iNode] - nX]
@@ -138,6 +138,7 @@ def scorf_bdt_sample (
 
         loglikelihood += learning_rate * value[iTree, iNode] 
      
+      print (1. / (1. + exp2(-loglikelihood)))
       if _rnd(0,1) < 1. / (1. + exp2(-loglikelihood)):
         break ## Accept 
 
