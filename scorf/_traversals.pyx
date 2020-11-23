@@ -103,7 +103,7 @@ def scorf_bdt_sample (
       float learning_rate,
       np.ndarray[FLOAT_t, ndim=2] out, 
     ):
-  "Fast implementation of sampling from the trained Gradient Boosting Classifier"
+  "Cython implementation of rejection method to sample from GBDT"
 
   cdef int nE = X.shape[0]
   cdef int nX = X.shape[1]
