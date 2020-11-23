@@ -90,7 +90,7 @@ class RandomForestSampler:
         validation_fraction = validation_fraction, 
         n_iter_no_change = n_iter_no_change, 
         tol = tol, 
-        ccp_alpha = ccp_alpha
+        ccp_alpha = ccp_alpha, 
         ##
         domain_extent = 0.1, 
         normalization_ratio = 10., 
