@@ -113,9 +113,9 @@ def scorf_bdt_sample (
   cdef int goRight = False;
 
   cdef FLOAT_t v = 0. 
-  cdef FLOAT_t likelihood = 0. 
+  cdef FLOAT_t loglikelihood = 0. 
 
-  cdef int iNone = 0;
+  cdef int iNode = 0;
   cdef int iRow = 0
   cdef int iTree = 0
   cdef int iAttempt  = 0
