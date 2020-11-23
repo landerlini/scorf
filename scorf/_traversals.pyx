@@ -116,6 +116,9 @@ def scorf_bdt_sample (
   cdef FLOAT_t likelihood = 0. 
 
   cdef int iNone = 0;
+  cdef int iRow = 0
+  cdef int iTree = 0
+  cdef int iAttempt  = 0
 
   for iRow in range(nE):
     for iAttempt in range (100): 
@@ -138,8 +141,8 @@ def scorf_bdt_sample (
 
         loglikelihood += learning_rate * value[iTree, iNode] 
      
-      print (1. / (1. + exp2(-loglikelihood)))
       if _rnd(0,1) < 1. / (1. + exp2(-loglikelihood)):
+        print ("@", iAttempt)
         break ## Accept 
 
     if iAttempt == 100: 
