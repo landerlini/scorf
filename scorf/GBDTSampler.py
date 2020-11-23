@@ -91,6 +91,10 @@ class RandomForestSampler:
         n_iter_no_change = n_iter_no_change, 
         tol = tol, 
         ccp_alpha = ccp_alpha
+        ##
+        domain_extent = 0.1, 
+        normalization_ratio = 10., 
+        normalization_weight = 100., 
       )
     
     self.domain_        = None
