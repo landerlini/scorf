@@ -1,34 +1,23 @@
 """
-RandomForestSampler
+GBDTSampler
 -------------------
-
-The construction of MC generators able to reproduce distributions obtained 
-from a dataset of real data is of crucial importance to parametrize the 
-response of complex systems in simulation and what-if studies. 
-`RandomForestSampler` is a thin overlay on top of scikit-learn 
-`RandomForestClassifier` designed to learn the distribution of a 
-training dataset from the comparison with a uniformly distributed sample.
-The trained forest can then be used to sample a single tree, and from 
-that tree a leaf, possibly depending on some condition of part of the 
-variables. A new data is obtained from uniform generation within the 
-leaf volume. 
 
 """
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import GradientBoostingClassifier
 
 from ._traversals import scorf_sample 
 
 class RandomForestSampler:
   """
-  RandomForestSampler
+  GBDTSampler
   -------------------
 
-  A thin layer built on top of scikit-learn `RandomForestClassifier`
+  A thin layer built on top of scikit-learn `GradientBoostingClassifier`
   to learn the distribution of an input dataset and efficiently 
   sampling it. 
 
-  Most of the input parameters are passed to `RandomForestClassifier`
+  Most of the input parameters are passed to `GradientBoostingClassifier`
   but some default value was tweaked to make it more sensible for 
   density estimation. 
 
@@ -47,28 +36,31 @@ class RandomForestSampler:
    - normalization_weight (float, default: 100)
      a weight applied during the training to the normalization dataset.
      It should be as large as not compromising numerical accuracy 
-  
+
   """
   def __init__ (self, 
-        n_estimators=100, *, 
-        criterion='entropy', 
-        max_depth=None, 
+        loss='entropy', 
+        learning_rate=0.1, 
+        n_estimators=100, 
+        subsample=1.0, 
+        criterion='friedman_mse', 
         min_samples_split=2, 
-        min_samples_leaf=5, 
+        min_samples_leaf=1, 
         min_weight_fraction_leaf=0.0, 
-        max_features='auto', 
-        max_leaf_nodes=None, 
+        max_depth=3, 
         min_impurity_decrease=0.0, 
         min_impurity_split=None, 
-        bootstrap=True, 
-        oob_score=False, 
-        n_jobs=None, 
+        init=None, 
         random_state=None, 
+        max_features=None, 
         verbose=0, 
+        max_leaf_nodes=None, 
         warm_start=False, 
-        class_weight=None, 
-        ccp_alpha=0.0, 
-        max_samples=None,
+        presort='deprecated', 
+        validation_fraction=0.1, 
+        n_iter_no_change=None, 
+        tol=0.0001, 
+        ccp_alpha=0.0
         ##
         domain_extent = 0.1, 
         normalization_ratio = 10., 
@@ -76,26 +68,29 @@ class RandomForestSampler:
       ):
 
     ## Create the forest 
-    self.forest_ = RandomForestClassifier (
+    self.forest_ = GradientBoostingClassifier (
+        loss = loss, 
+        learning_rate = learning_rate, 
         n_estimators = n_estimators, 
+        subsample = subsample, 
         criterion = criterion, 
-        max_depth = max_depth, 
         min_samples_split = min_samples_split, 
         min_samples_leaf = min_samples_leaf, 
         min_weight_fraction_leaf = min_weight_fraction_leaf, 
-        max_features = max_features, 
-        max_leaf_nodes = max_leaf_nodes, 
+        max_depth = max_depth, 
         min_impurity_decrease = min_impurity_decrease, 
         min_impurity_split = min_impurity_split, 
-        bootstrap = bootstrap, 
-        oob_score = oob_score, 
-        n_jobs = n_jobs, 
+        init = init, 
         random_state = random_state, 
+        max_features = max_features, 
         verbose = verbose, 
+        max_leaf_nodes = max_leaf_nodes, 
         warm_start = warm_start, 
-        class_weight = class_weight, 
-        ccp_alpha = ccp_alpha, 
-        max_samples = max_samples
+        presort = presort, 
+        validation_fraction = validation_fraction, 
+        n_iter_no_change = n_iter_no_change, 
+        tol = tol, 
+        ccp_alpha = ccp_alpha
       )
     
     self.domain_        = None
@@ -219,102 +214,102 @@ class RandomForestSampler:
     return self.forest_.predict_proba ( XY ) [:, 1] 
 
 
-  def _predict_slow (self, X): 
-    "Pure-python implementation of the prediction method, for debugging only"
-    if len(X.shape) < 2: 
-      raise ValueError ("Ambiguous array for X, did you mean np.c_[X]?") 
+#  def _predict_slow (self, X): 
+#    "Pure-python implementation of the prediction method, for debugging only"
+#    if len(X.shape) < 2: 
+#      raise ValueError ("Ambiguous array for X, did you mean np.c_[X]?") 
+#
+#    if self.cached_tree_arrays_ is None:
+#      self._cache_trees() 
+#
+#    trees = [t.tree_ for t in self.forest_.estimators_] 
+#    ret = np.empty ( (len(X), self.forest_.n_features_ - self.n_conditions_), dtype = X.dtype )
+#    for iRow, xRow in enumerate(X): 
+#      iTree = np.random.choice ( len(trees) )
+#      tree = trees[iTree] 
+#      v = tree.value[:,:,1]
+#      iNode = 0
+#      domain = self.domain_.copy() 
+#      while tree.feature[iNode] >= 0:
+#        r = np.random.uniform(0,1)
+#        wr = v[tree.children_left[iNode]]/v[iNode]
+#        th = tree.threshold[iNode]
+#        f = tree.feature [iNode]
+#        goRight = False 
+#
+#        if f < self.n_conditions_: goRight = (xRow[f]>th)
+#        else: goRight = (r > wr) 
+#
+#        if not goRight:
+#          domain [tree.feature[iNode],1] = min(domain [tree.feature[iNode],1], tree.threshold[iNode])
+#          iNode = tree.children_left[iNode]
+#        else:
+#          domain [tree.feature[iNode],0] = max(domain [tree.feature[iNode],0], tree.threshold[iNode])
+#          iNode = tree.children_right[iNode]
+#
+#      ret [iRow] = np.array([np.random.uniform (row[0], row[1]) for row in domain[self.n_conditions_:]])
+#
+#    return ret if len(ret.shape) == 2 else np.expand_dims (ret,0)
 
-    if self.cached_tree_arrays_ is None:
-      self._cache_trees() 
-
-    trees = [t.tree_ for t in self.forest_.estimators_] 
-    ret = np.empty ( (len(X), self.forest_.n_features_ - self.n_conditions_), dtype = X.dtype )
-    for iRow, xRow in enumerate(X): 
-      iTree = np.random.choice ( len(trees) )
-      tree = trees[iTree] 
-      v = tree.value[:,:,1]
-      iNode = 0
-      domain = self.domain_.copy() 
-      while tree.feature[iNode] >= 0:
-        r = np.random.uniform(0,1)
-        wr = v[tree.children_left[iNode]]/v[iNode]
-        th = tree.threshold[iNode]
-        f = tree.feature [iNode]
-        goRight = False 
-
-        if f < self.n_conditions_: goRight = (xRow[f]>th)
-        else: goRight = (r > wr) 
-
-        if not goRight:
-          domain [tree.feature[iNode],1] = min(domain [tree.feature[iNode],1], tree.threshold[iNode])
-          iNode = tree.children_left[iNode]
-        else:
-          domain [tree.feature[iNode],0] = max(domain [tree.feature[iNode],0], tree.threshold[iNode])
-          iNode = tree.children_right[iNode]
-
-      ret [iRow] = np.array([np.random.uniform (row[0], row[1]) for row in domain[self.n_conditions_:]])
-
-    return ret if len(ret.shape) == 2 else np.expand_dims (ret,0)
-
-  def predict (self, X): 
-    """
-    Randomly generates a sample distributed according to the underlying pdf of 
-    the training sample. 
-
-    If the parameter X is an array, it must define the conditions to the 
-    generated sample, and only the generated Y variables are returned. 
-    If it is instead an integer, then both X and Y variables are generated 
-    and returned in a unique, stacked array. 
-
-    Parameters:
-     - X: np.ndarray or int
-       Either the conditions for the sampled dataset, 
-       expressed as a (n_entries, n_conditional_features) array; 
-       or an integer defining the number of samples to be generated.
-
-    Returns: np.ndarray
-      An array with shape (n_entries, n_features) where n_features is 
-      n_conditional_features + n_conditioned_features if X is an integer 
-      defining n_entries. Or, otherwise, of an array of shape 
-      (n_entries, n_conditioned_features). 
-
-    """
-    if isinstance (X, np.ndarray):
-      if len(X.shape) < 2: 
-        raise ValueError ("Ambiguous array for X, did you mean np.c_[X]?") 
-
-      if self.cached_tree_arrays_ is None:
-        self._cache_trees() 
-
-      ret = np.empty ( (len(X), self.forest_.n_features_ - self.n_conditions_ ) )
-
-      return (scorf_sample ( X, 
-                self.domain_,
-                self.cached_tree_arrays_ ['feature'], 
-                self.cached_tree_arrays_ ['threshold'], 
-                self.cached_tree_arrays_ ['value'], 
-                self.cached_tree_arrays_ ['children_left'], 
-                self.cached_tree_arrays_ ['children_right'], 
-                ret
-              ))
-    elif isinstance (X, int):
-      if X <= 0:
-        raise ValueError ("Can not produce a negative number of events") 
-
-      if self.cached_tree_arrays_ is None:
-        self._cache_trees() 
-
-      ret = np.empty ( (X, self.forest_.n_features_ ) )
-
-      return (scorf_sample ( np.empty ( (X,0)), 
-                self.domain_,
-                self.cached_tree_arrays_ ['feature'], 
-                self.cached_tree_arrays_ ['threshold'], 
-                self.cached_tree_arrays_ ['value'], 
-                self.cached_tree_arrays_ ['children_left'], 
-                self.cached_tree_arrays_ ['children_right'], 
-                ret
-              ))
+##   def predict (self, X): 
+##     """
+##     Randomly generates a sample distributed according to the underlying pdf of 
+##     the training sample. 
+## 
+##     If the parameter X is an array, it must define the conditions to the 
+##     generated sample, and only the generated Y variables are returned. 
+##     If it is instead an integer, then both X and Y variables are generated 
+##     and returned in a unique, stacked array. 
+## 
+##     Parameters:
+##      - X: np.ndarray or int
+##        Either the conditions for the sampled dataset, 
+##        expressed as a (n_entries, n_conditional_features) array; 
+##        or an integer defining the number of samples to be generated.
+## 
+##     Returns: np.ndarray
+##       An array with shape (n_entries, n_features) where n_features is 
+##       n_conditional_features + n_conditioned_features if X is an integer 
+##       defining n_entries. Or, otherwise, of an array of shape 
+##       (n_entries, n_conditioned_features). 
+## 
+##     """
+##     if isinstance (X, np.ndarray):
+##       if len(X.shape) < 2: 
+##         raise ValueError ("Ambiguous array for X, did you mean np.c_[X]?") 
+## 
+##       if self.cached_tree_arrays_ is None:
+##         self._cache_trees() 
+## 
+##       ret = np.empty ( (len(X), self.forest_.n_features_ - self.n_conditions_ ) )
+## 
+##       return (scorf_sample ( X, 
+##                 self.domain_,
+##                 self.cached_tree_arrays_ ['feature'], 
+##                 self.cached_tree_arrays_ ['threshold'], 
+##                 self.cached_tree_arrays_ ['value'], 
+##                 self.cached_tree_arrays_ ['children_left'], 
+##                 self.cached_tree_arrays_ ['children_right'], 
+##                 ret
+##               ))
+##     elif isinstance (X, int):
+##       if X <= 0:
+##         raise ValueError ("Can not produce a negative number of events") 
+## 
+##       if self.cached_tree_arrays_ is None:
+##         self._cache_trees() 
+## 
+##       ret = np.empty ( (X, self.forest_.n_features_ ) )
+## 
+##       return (scorf_sample ( np.empty ( (X,0)), 
+##                 self.domain_,
+##                 self.cached_tree_arrays_ ['feature'], 
+##                 self.cached_tree_arrays_ ['threshold'], 
+##                 self.cached_tree_arrays_ ['value'], 
+##                 self.cached_tree_arrays_ ['children_left'], 
+##                 self.cached_tree_arrays_ ['children_right'], 
+##                 ret
+##               ))
 
   def _cache_trees ( self ): 
     "Internal. Stores all trees in a set of large arrays readable with Cython"
@@ -328,5 +323,6 @@ class RandomForestSampler:
     self.cached_tree_arrays_ ['value'] = np.stack ([
         np.resize(t.value[:,:,1], n_nodes) for t in trees 
       ]) 
+
 
 
