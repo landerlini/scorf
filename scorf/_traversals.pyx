@@ -81,8 +81,8 @@ def scorf_sample (
 from libc.stdlib cimport rand, RAND_MAX
 from libc.math cimport exp2
 
-def _rnd ( float m, float M ):
-  return m + (float (rand())/float(RAND_MAX)) * (M-m) 
+cdef FLOAT_t _rnd ( FLOAT_t m, FLOAT_t M ):
+  return m + (FLOAT_t (rand())/FLOAT_t(RAND_MAX)) * (M-m) 
 
 
 
@@ -142,7 +142,7 @@ def scorf_bdt_sample (
         loglikelihood += learning_rate * value[iTree, iNode] 
      
       if _rnd(0,1) < 1. / (1. + exp2(-loglikelihood)):
-        print ("@", iAttempt)
+        #print ("@", iAttempt)
         break ## Accept 
 
     if iAttempt == 100: 
