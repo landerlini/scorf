@@ -119,6 +119,7 @@ def scorf_bdt_sample (
   cdef int iRow = 0
   cdef int iTree = 0
   cdef int iAttempt  = 0
+  cdef int iOut = 0
 
   for iRow in range(nE):
     for iAttempt in range (100): 
