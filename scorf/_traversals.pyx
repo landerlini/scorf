@@ -82,7 +82,7 @@ from libc.stdlib cimport rand, RAND_MAX
 from libc.math cimport exp2
 
 cdef FLOAT_t _rnd ( FLOAT_t m, FLOAT_t M ):
-  return m + (FLOAT_t (rand())/FLOAT_t(RAND_MAX)) * (M-m) 
+  return m + rand() * (M-m) /RAND_MAX 
 
 
 
