@@ -142,7 +142,7 @@ def scorf_bdt_sample (
 
         loglikelihood += learning_rate * value[iTree, iNode] 
      
-      if _rnd(0,1) < 1. / (1. + exp2(-loglikelihood)):
+      if _rnd(0,1) < 1. / (1. + exp2(-2.*loglikelihood)):
         #print ("@", iAttempt)
         break ## Accept 
 
