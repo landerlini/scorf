@@ -103,9 +103,9 @@ class GBDTSampler (BaseSampler):
       )
 
     BaseSampler.__init__ (self, classifier, 
-          domain_extent = 0.1, 
-          normalization_ratio = 10., 
-          normalization_weight = 100., 
+          domain_extent = domain_extent, 
+          normalization_ratio = normalization_ratio, 
+          normalization_weight = normalization_weight, 
         )
     self._learning_rate = learning_rate
     
